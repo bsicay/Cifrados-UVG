@@ -1,3 +1,10 @@
+
+# UNIVERSIDAD DEL VALLE DE GUATEMALA
+# BRANDON RONALDO SICAY CUMES 21757
+# MODELO UTILIZADO: GTP-o1
+# CHAT UTILIZADO: https://chatgpt.com/share/67a2c876-3d5c-800f-8793-93e95de6f743
+
+
 from bin_to_ascii import binary_to_ascii
 from ascii_to_bin import ascii_to_bin
 from xor import xor_binary

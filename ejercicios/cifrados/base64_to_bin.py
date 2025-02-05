@@ -1,3 +1,10 @@
+
+# UNIVERSIDAD DEL VALLE DE GUATEMALA
+# BRANDON RONALDO SICAY CUMES 21757
+# MODELO UTILIZADO: GTP-o1
+# CHAT UTILIZADO: https://chatgpt.com/share/67a2c876-3d5c-800f-8793-93e95de6f743
+
+
 def base64_to_binary(b64_string):
     """
     Decodifica una cadena en Base64 y devuelve su contenido en binario (bits) como una cadena.

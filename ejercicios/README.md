@@ -66,3 +66,5 @@ El **Cifrado de César** es de gran importancia histórica y educativa. Aunque s
 
 
 
+REFERENCIAS
+Luciano, D., & Prichett, G. (1987). Cryptology: From Caesar ciphers to public-key cryptosystems. The College Mathematics Journal, 18(1), 2-17.
