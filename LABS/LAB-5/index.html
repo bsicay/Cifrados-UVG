@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simulación Interactiva BB84 (Corregida)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 0 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+      position: relative;
+    }
+    th {
+      background-color: #eee;
+    }
+    #key-display {
+      font-size: 18px;
+      text-align: center;
+      margin-top: 10px;
+    }
+    .toggle-label {
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .coin {
+      display: inline-block;
+      width: 65px;
+      height: 40px;
+      margin: 0 auto;
+       background-image: url('https://cdn.pixabay.com/animation/2025/06/03/03/30/03-30-33-674_512.gif');
+      /* sprite coin: primera mitad cara, segunda mitad cruz */
+      background-size: 80px 40px;
+      animation-duration: 0.6s;
+      animation-iteration-count: 1;
+    }
+    @keyframes spin {
+      0%   { background-position:    0 0; }
+      50%  { background-position: -40px 0; }
+      100% { background-position:    0 0; }
+    }
+    .spinning {
+      animation-name: spin;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Simulación Interactiva del Protocolo BB84</h1>
+
+  <div class="controls">
+    <label class="toggle-label">
+      <input type="checkbox" id="toggle-eve" /> Incluir a Eve
+    </label>
+    <button id="next-round">Lanzar Siguiente Ronda</button>
+    <button id="reset-sim">Reiniciar Simulación</button>
+  </div>
+
+  <table id="history-table">
+    <thead>
+      <tr>
+        <th>N°</th>
+        <th>Alice Bit</th>
+        <th>Alice Base</th>
+        <th>Moneda Alice</th>
+        <th>Fotón Enviado</th>
+        <th>Eve Base</th>
+        <th>Moneda Eve</th>
+        <th>Bob Base</th>
+        <th>Moneda Bob</th>
+        <th>Bob Bit</th>
+        <th>Bases coinciden</th>
+        <th>Usar?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Filas generadas dinámicamente -->
+    </tbody>
+  </table>
+
+  <div id="key-display">
+    <strong>Clave secreta actual:</strong> <span id="secret-key"></span>
+  </div>
+
+  <script>
+    // --- Variables globales de simulación ---
+    let roundIndex = 0;
+    const TOTAL_ROUNDS = 15;
+
+    // Almacenamos resultados de cada ronda
+    let aliceBits   = [];
+    let aliceBases  = [];
+    let aliceCoins  = [];
+    let eveBases    = [];
+    let eveCoins    = [];
+    let bobBases    = [];
+    let bobCoins    = [];
+    let sentBits    = [];
+    let bobBits     = [];
+    let basesMatch  = [];
+    let useBit      = [];
+    let secretKey   = [];
+
+    const basesList   = ['rect', 'diag'];
+    const baseSymbols = { 'rect': '↕', 'diag': '↗' };
+
+    // Referencias al DOM
+    const historyTableBody = document.querySelector('#history-table tbody');
+    const nextRoundBtn     = document.getElementById('next-round');
+    const resetBtn         = document.getElementById('reset-sim');
+    const toggleEve        = document.getElementById('toggle-eve');
+    const secretKeySpan    = document.getElementById('secret-key');
+
+    // Inicializa o reinicia la simulación
+    function initSimulation() {
+      roundIndex = 0;
+      aliceBits   = Array(TOTAL_ROUNDS).fill(null);
+      aliceBases  = Array(TOTAL_ROUNDS).fill(null);
+      aliceCoins  = Array(TOTAL_ROUNDS).fill(null);
+      eveBases    = Array(TOTAL_ROUNDS).fill(null);
+      eveCoins    = Array(TOTAL_ROUNDS).fill(null);
+      bobBases    = Array(TOTAL_ROUNDS).fill(null);
+      bobCoins    = Array(TOTAL_ROUNDS).fill(null);
+      sentBits    = Array(TOTAL_ROUNDS).fill(null);
+      bobBits     = Array(TOTAL_ROUNDS).fill(null);
+      basesMatch  = Array(TOTAL_ROUNDS).fill(false);
+      useBit      = Array(TOTAL_ROUNDS).fill(false);
+      secretKey   = [];
+      historyTableBody.innerHTML = '';
+      secretKeySpan.textContent   = '';
+    }
+
+    // Simula un lanzamiento de moneda: devuelve 0 o 1
+    function flipCoin() {
+      return Math.random() < 0.5 ? 0 : 1;
+    }
+
+    // Convierte un resultado de moneda (0/1) en base (rect/diag)
+    function coinToBase(coin) {
+      return coin === 0 ? 'rect' : 'diag';
+    }
+
+    // Crea un <div> con la animación de moneda y lo añade a la celda
+    function animateCoinCell(td, coinResult) {
+      // primero ponemos el valor numérico en la celda
+      td.textContent = coinResult;
+      // luego creamos el div que gira
+      const coinDiv = document.createElement('div');
+      coinDiv.classList.add('coin', 'spinning');
+      td.appendChild(coinDiv);
+      // quitamos la animación después de 600ms
+      setTimeout(() => coinDiv.classList.remove('spinning'), 600);
+    }
+
+    // Ejecuta una única ronda de BB84
+    function runNextRound() {
+      if (roundIndex >= TOTAL_ROUNDS) {
+        alert('Se completaron las ' + TOTAL_ROUNDS + ' rondas.');
+        return;
+      }
+      const i = roundIndex;
+
+      // 1) Alice lanza moneda -> bit y base
+      const aCoin = flipCoin();
+      const aBit  = aCoin;  // 0 ó 1
+      const aBase = coinToBase(aCoin);
+      aliceCoins[i] = aCoin;
+      aliceBits[i]  = aBit;
+      aliceBases[i] = aBase;
+
+      // 2) Eve (si está activa) lanza moneda -> base y mide
+      const includeEve = toggleEve.checked;
+      let eBit = null, eBase = null, eCoin = null;
+      if (includeEve) {
+        eCoin = flipCoin();
+        eBase = coinToBase(eCoin);
+        eveCoins[i] = eCoin;
+        eveBases[i] = eBase;
+        // Si la base Eve coincide con la de Alice, mide correcto
+        if (eBase === aBase) {
+          eBit = aBit;
+        } else {
+          eBit = flipCoin(); // bit aleatorio
+        }
+      } else {
+        eveCoins[i] = null;
+        eveBases[i] = null;
+      }
+
+      // 3) Bob lanza moneda -> base y mide
+      const bCoin = flipCoin();
+      const bBase = coinToBase(bCoin);
+      bobCoins[i] = bCoin;
+      bobBases[i] = bBase;
+
+      // 4) Determinar qué bit llega a Bob: de Alice o de Eve
+      let photonBit, photonBase;
+      if (includeEve) {
+        photonBit  = eBit;
+        photonBase = eBase;
+      } else {
+        photonBit  = aBit;
+        photonBase = aBase;
+      }
+      sentBits[i] = photonBit;
+
+      // 5) Bob mide:
+      let bBit;
+      if (bBase === photonBase) {
+        bBit = photonBit;
+      } else {
+        bBit = flipCoin();
+      }
+      bobBits[i] = bBit;
+
+      // 6) Comparar bases A vs B
+      basesMatch[i] = (aBase === bBase);
+      useBit[i]     = basesMatch[i];
+      if (useBit[i]) {
+        secretKey.push(aBit);
+        secretKeySpan.textContent = secretKey.join('');
+      }
+
+      // 7) Construir fila en la tabla
+      const row = document.createElement('tr');
+
+      function addCell(text) {
+        const td = document.createElement('td');
+        td.textContent = text !== null ? text : '';
+        row.appendChild(td);
+        return td;
+      }
+
+      addCell(i + 1);                            // N°
+      addCell(aBit);                             // Alice Bit
+      addCell(baseSymbols[aBase]);               // Alice Base
+      const tdAliceCoin = addCell('');           // Moneda Alice (animar luego)
+      addCell(photonBit);                        // Fotón enviado
+
+      if (includeEve) {
+        addCell(eBase ? baseSymbols[eBase] : '');   // Eve Base
+        const tdEveCoin = addCell('');               // Moneda Eve
+        // Animar moneda Eve después
+        setTimeout(() => animateCoinCell(tdEveCoin, eCoin), 100);
+      } else {
+        addCell('—'); // Sin Eve Base
+        addCell('—'); // Sin Moneda Eve
+      }
+
+      addCell(baseSymbols[bBase]);                // Bob Base
+      const tdBobCoin = addCell('');              // Moneda Bob
+      addCell(bBit);                              // Bob Bit
+      addCell(basesMatch[i] ? 'sí' : 'no');       // Bases coinciden
+      addCell(useBit[i] ? 'sí' : 'no');           // Usar?
+
+      historyTableBody.appendChild(row);
+
+      // Animar monedas (Alice y Bob) con un pequeño delay para verse bien
+      setTimeout(() => {
+        animateCoinCell(tdAliceCoin, aCoin);
+        animateCoinCell(tdBobCoin, bCoin);
+      }, 100);
+
+      roundIndex++;
+    }
+
+    // Reiniciar toda la simulación
+    function resetSimulation() {
+      initSimulation();
+    }
+
+    // Asociar eventos a botones
+    nextRoundBtn.addEventListener('click', runNextRound);
+    resetBtn.addEventListener('click', resetSimulation);
+
+    // Al cargar la página, inicializamos
+    initSimulation();
+  </script>
+</body>
+</html>
